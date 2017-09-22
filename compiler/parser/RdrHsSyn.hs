@@ -197,11 +197,14 @@ mkDataDefn :: NewOrData
 mkDataDefn new_or_data cType mcxt ksig data_cons maybe_deriv
   = do { checkDatatypeContext mcxt
        ; let cxt = fromMaybe (noLoc []) mcxt
-       ; return (HsDataDefn { dd_ND = new_or_data, dd_cType = cType
+       ; let dataDefn = (HsDataDefn { dd_ND = new_or_data, dd_cType = cType
                             , dd_ctxt = cxt
                             , dd_cons = data_cons
                             , dd_kindSig = ksig
-                            , dd_derivs = maybe_deriv }) }
+                            , dd_derivs = maybe_deriv })
+       ; let debug = (pprTrace "PIYO7a" (ppr dataDefn) "piyo 07a")
+       ; let debug' = (pprTrace "PIYO7b" (vcat [ppr new_or_data, ppr cType, ppr cxt, ppr data_cons, ppr ksig, ppr maybe_deriv]) "piyo 07b")
+       ; debug `seq` debug' `seq` return dataDefn }
 
 
 mkTySynonym :: SrcSpan

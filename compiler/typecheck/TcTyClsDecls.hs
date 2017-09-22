@@ -2107,7 +2107,8 @@ tied, so we can look at things freely.
 
 checkValidTyCl :: TyCon -> TcM TyCon
 checkValidTyCl tc
-  = setSrcSpan (getSrcSpan tc) $
+  = do
+  setSrcSpan (getSrcSpan tc) $
     addTyConCtxt tc $
     recoverM recovery_code
              (do { traceTc "Starting validity for tycon" (ppr tc)
@@ -2203,7 +2204,6 @@ checkValidTyCon tc
                ; let ex_ok = existential_ok || gadt_ok
                      -- Data cons can have existential context
                ; mapM_ (checkValidDataCon dflags ex_ok tc) data_cons
-
                 -- Check that fields with the same name share a type
                ; mapM_ check_fields groups }}
   where

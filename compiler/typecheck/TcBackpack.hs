@@ -616,6 +616,7 @@ mergeSignatures
                             -- pick them up if they are referenced explicitly
                             -- (@foo@) or even if we do a module reexport
                             -- (@module A@).
+                            (addWarnTc NoReason (text "debug nakaji 2"))
                             let ispec = ImpSpec ImpDeclSpec{
                                             -- NB: This needs to be mod name
                                             -- of the local signature, not

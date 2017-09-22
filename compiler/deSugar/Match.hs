@@ -739,7 +739,8 @@ matchWrapper ctxt mb_scr (MG { mg_alts = L _ matches
         ; eqns_info   <- mapM (mk_eqn_info new_vars) matches
 
         -- pattern match check warnings
-        ; unless (isGenerated origin) $
+        ; let debug = pprTrace "PIYO11a" (vcat [ppr (isGenerated origin), ppr origin]) "piyo 11a"
+        ; debug `seq` unless False {- (isGenerated origin) -} $
           when (isAnyPmCheckEnabled dflags (DsMatchContext ctxt locn)) $
           addTmCsDs (genCaseTmCs1 mb_scr new_vars) $
               -- See Note [Type and Term Equality Propagation]
@@ -747,7 +748,8 @@ matchWrapper ctxt mb_scr (MG { mg_alts = L _ matches
 
         ; result_expr <- handleWarnings $
                          matchEquations ctxt new_vars eqns_info rhs_ty
-        ; return (new_vars, result_expr) }
+        ; let debug2 = pprTrace "PIYO result_expr" (ppr result_expr) "PIYO result_expr"
+        ; debug2 `seq` return (new_vars, result_expr) }
   where
     mk_eqn_info vars (L _ (Match _ pats _ grhss))
       = do { dflags <- getDynFlags

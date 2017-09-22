@@ -333,7 +333,9 @@ dsHsBind dflags (AbsBindsSig { abs_tvs = tyvars, abs_ev_vars = dicts
   = putSrcSpanDs bind_loc $
     addDictsDs (toTcTypeBag (listToBag dicts)) $
              -- addDictsDs: push type constraints deeper for pattern match check
-    do { (args, body) <- matchWrapper
+    do {
+       ; let debug = pprTrace "PIYO10a" (vcat [ppr bind, ppr $ mkPrefixFunRhs (noLoc $ idName global)]) "piyo 10a"
+       ; (args, body) <- debug `seq` matchWrapper
                            (mkPrefixFunRhs (noLoc $ idName global))
                            Nothing matches
        ; core_wrap <- dsHsWrapper co_fn
@@ -356,7 +358,6 @@ dsHsBind dflags (AbsBindsSig { abs_tvs = tyvars, abs_ev_vars = dicts
        ; let global' = addIdSpecialisations global rules
              main_bind = makeCorePair dflags global' (isDefaultMethod prags)
                                       (dictArity dicts) rhs
-
        ; return (force_vars, main_bind : fromOL spec_binds) }
 
   | otherwise

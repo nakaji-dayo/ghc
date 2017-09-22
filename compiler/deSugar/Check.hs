@@ -295,7 +295,9 @@ checkSingle dflags ctxt@(DsMatchContext _ locn) var p = do
   mb_pm_res <- tryM (getResult (checkSingle' locn var p))
   case mb_pm_res of
     Left  _   -> warnPmIters dflags ctxt
-    Right res -> dsPmWarn dflags ctxt res
+    Right res -> do
+      let debug = pprTrace "PIYO08a" (ppr ctxt) "piyo 08 a"
+      debug `seq` dsPmWarn dflags ctxt res
 
 -- | Check a single pattern binding (let)
 checkSingle' :: SrcSpan -> Id -> Pat GhcTc -> PmM PmResult
@@ -330,7 +332,9 @@ checkMatches dflags ctxt vars matches = do
     _normal_match      -> checkMatches' vars matches
   case mb_pm_res of
     Left  _   -> warnPmIters dflags ctxt
-    Right res -> dsPmWarn dflags ctxt res
+    Right res -> do
+      let debug = pprTrace "PIYO09a" (vcat [ppr ctxt, ppr vars, text "matches:", vcat (ppr <$> matches)]) "piyo 09 a"
+      debug `seq` dsPmWarn dflags ctxt res
 
 -- | Check a matchgroup (case, functions, etc.). To be called on a non-empty
 -- list of matches. For empty case expressions, use checkEmptyCase' instead.
@@ -1652,7 +1656,7 @@ dsPmWarn dflags ctx@(DsMatchContext kind loc) pm_result
            [ValVec [] _]
                     -> text "Guards do not cover entire pattern space"
            _missing -> let us = map ppr qs
-                       in  hang (text "Patterns not matched:") 4
+                       in  hang (text "Patterns not matched !!:") 4
                                 (vcat (take maxPatterns us)
                                  $$ dots maxPatterns us)
 

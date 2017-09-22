@@ -349,8 +349,9 @@ initTcWithGbl hsc_env gbl_env loc do_this
 
       ; let { final_res | errorsFound dflags msgs = Nothing
                         | otherwise               = maybe_res }
-
-      ; return (msgs, final_res)
+      ; let d1 = (pprTrace "PIYO23" (vcat $ pprErrMsgBagWithLoc $ fst msgs) "piyo 23a")
+      ; let d2 = (pprTrace "PIYO23" (vcat $ pprErrMsgBagWithLoc $ snd msgs) "piyo 23b")
+      ; d1 `seq` d2 `seq` return (msgs, final_res)
       }
   where dflags = hsc_dflags hsc_env
 
@@ -1008,7 +1009,9 @@ tryTc thing_inside
 
         msgs <- readTcRef errs_var ;
 
-        return (msgs, case res of
+        let d1 = (pprTrace "PIYO22" (vcat $ pprErrMsgBagWithLoc $ fst msgs) "piyo 22a") ;
+            d2 = (pprTrace "PIYO21" (vcat $ pprErrMsgBagWithLoc $ snd msgs) "piyo 21a") ;
+        in d1 `seq` d2 `seq` return (msgs, case res of
                         Left _    -> Nothing
                         Right val -> Just val)
         -- The exception is always the IOEnv built-in
@@ -1257,7 +1260,8 @@ warnTcM reason warn_if_true warn_msg
 addWarnTc :: WarnReason -> MsgDoc -> TcM ()
 addWarnTc reason msg
  = do { env0 <- tcInitTidyEnv ;
-      addWarnTcM reason (env0, msg) }
+        let d1 = (pprTrace "PIYO24" (msg) "piyo 24a") ;
+        in d1 `seq` addWarnTcM reason (env0, msg) }
 
 -- | Display a warning in a given context.
 addWarnTcM :: WarnReason -> (TidyEnv, MsgDoc) -> TcM ()

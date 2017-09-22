@@ -63,6 +63,8 @@ import Module
 
 import Control.Monad
 
+import DynFlags
+
 {-
 ************************************************************************
 *                                                                      *
@@ -746,13 +748,14 @@ tcAddImplicits :: [TyCon] -> TcM TcGblEnv
 --   * add bindings for record selectors
 --   * add bindings for type representations for the TyThings
 tcAddImplicits tycons
-  = discardWarnings $
+  = -- discardWarnings $
     tcExtendGlobalEnvImplicit implicit_things  $
     tcExtendGlobalValEnv def_meth_ids          $
     do { traceTc "tcAddImplicits" $ vcat
             [ text "tycons" <+> ppr tycons
             , text "implicits" <+> ppr implicit_things ]
-       ; tcRecSelBinds (mkRecSelBinds tycons) }
+       ; mkRecSelBinds tycons >>= tcRecSelBinds
+       ;  }
  where
    implicit_things = concatMap implicitTyConThings tycons
    def_meth_ids    = mkDefaultMethodIds tycons
@@ -810,28 +813,35 @@ when typechecking the [d| .. |] quote, and typecheck them later.
 ************************************************************************
 -}
 
-mkRecSelBinds :: [TyCon] -> HsValBinds GhcRn
+mkRecSelBinds :: [TyCon] -> TcM (HsValBinds GhcRn)
 -- NB We produce *un-typechecked* bindings, rather like 'deriving'
 --    This makes life easier, because the later type checking will add
 --    all necessary type abstractions and applications
-mkRecSelBinds tycons
-  = ValBindsOut binds sigs
-  where
-    (sigs, binds) = unzip rec_sels
-    rec_sels = map mkRecSelBind [ (tc,fld)
-                                | tc <- tycons
-                                , fld <- tyConFieldLabels tc ]
+mkRecSelBinds tycons = do
+  rec_sels <- mapM mkRecSelBind [ (tc,fld)
+                          | tc <- tycons
+                          , fld <- tyConFieldLabels tc ]
+  let (sigs, binds) = unzip rec_sels
+  return $ ValBindsOut binds sigs
+  -- = return $ ValBindsOut binds sigs
+  -- where
+  --   (sigs, binds) = unzip rec_sels
+  --   rec_sels = mapM mkRecSelBind [ (tc,fld)
+  --                               | tc <- tycons
+  --                               , fld <- tyConFieldLabels tc ]
 
-mkRecSelBind :: (TyCon, FieldLabel) -> (LSig GhcRn, (RecFlag, LHsBinds GhcRn))
+mkRecSelBind :: (TyCon, FieldLabel) -> TcM (LSig GhcRn, (RecFlag, LHsBinds GhcRn))
 mkRecSelBind (tycon, fl)
   = mkOneRecordSelector all_cons (RecSelData tycon) fl
   where
     all_cons = map RealDataCon (tyConDataCons tycon)
 
 mkOneRecordSelector :: [ConLike] -> RecSelParent -> FieldLabel
-                    -> (LSig GhcRn, (RecFlag, LHsBinds GhcRn))
+                    -> TcM (LSig GhcRn, (RecFlag, LHsBinds GhcRn))
 mkOneRecordSelector all_cons idDetails fl
-  = (L loc (IdSig sel_id), (NonRecursive, unitBag (L loc sel_bind)))
+  = do
+  x <- sel_bind
+  return (L loc (IdSig sel_id), (NonRecursive, unitBag (L loc x)))
   where
     loc    = getSrcSpan sel_name
     lbl      = flLabel fl
@@ -863,11 +873,15 @@ mkOneRecordSelector all_cons idDetails fl
     -- Make the binding: sel (C2 { fld = x }) = x
     --                   sel (C7 { fld = x }) = x
     --    where cons_w_field = [C2,C7]
-    sel_bind = mkTopFunBind Generated sel_lname alts
+    sel_bind = do
+      xs <- alts
+      return $ mkTopFunBind Generated sel_lname xs
       where
-        alts | is_naughty = [mkSimpleMatch (mkPrefixFunRhs sel_lname)
+        alts | is_naughty = return [mkSimpleMatch (mkPrefixFunRhs sel_lname)
                                            [] unit_rhs]
-             | otherwise =  map mk_match cons_w_field ++ deflt
+             | otherwise = do
+                 xs <- deflt
+                 return $ map mk_match cons_w_field ++ xs
     mk_match con = mkSimpleMatch (mkPrefixFunRhs sel_lname)
                                  [L loc (mk_sel_pat con)]
                                  (L loc (HsVar (L loc field_var)))
@@ -884,12 +898,19 @@ mkOneRecordSelector all_cons idDetails fl
     -- Add catch-all default case unless the case is exhaustive
     -- We do this explicitly so that we get a nice error message that
     -- mentions this particular record selector
-    deflt | all dealt_with all_cons = []
-          | otherwise = [mkSimpleMatch CaseAlt
-                            [L loc (WildPat placeHolderType)]
-                            (mkHsApp (L loc (HsVar
-                                            (L loc (getName rEC_SEL_ERROR_ID))))
-                                     (L loc (HsLit msg_lit)))]
+    deflt | all dealt_with all_cons = return []
+          | otherwise = do
+              setSrcSpan loc $ addWarnTc NoReason (hang (text "record selecter 部分関数") 5 $ text "record selecter 部分関数X")
+              return [mkSimpleMatch CaseAlt
+                [L loc (WildPat placeHolderType)]
+                (mkHsApp (L loc (HsVar
+                                  (L loc (getName rEC_SEL_ERROR_ID))))
+                  (L loc (HsLit msg_lit)))]
+    -- deflt = [mkSimpleMatch CaseAlt
+    --                         [L loc (WildPat placeHolderType)]
+    --                         (mkHsApp (L loc (HsVar
+    --                                         (L loc (getName rEC_SEL_ERROR_ID))))
+    --                                  (L loc (HsLit msg_lit)))]
 
         -- Do not add a default case unless there are unmatched
         -- constructors.  We must take account of GADTs, else we

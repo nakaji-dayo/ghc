@@ -179,7 +179,7 @@ exports_from_avail Nothing rdr_env _imports _this_mod
   = let avails =
           map fix_faminst . gresToAvailInfo
             . filter isLocalGRE . globalRdrEnvElts $ rdr_env
-    in return (Nothing, avails)
+    in (addWarnTc NoReason (text "debug nakaji")) >> return (Nothing, avails)
   where
     -- #11164: when we define a data instance
     -- but not data family, re-export the family
